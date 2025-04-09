@@ -213,6 +213,41 @@ void remove_treasure(char* hunt_id, char* id)
   close(fisier);
 }
 
+//creare fisier pentru logg
+
+void log_file(char* hunt_id, char* operatie)
+{
+  struct stat st;
+  if(stat(hunt_id,&st)==-1)
+    {
+      perror("Nu exista directorul!\n");
+      exit(-1);
+    }
+
+  char path[256];
+
+  snprintf(path, sizeof(path), "%s/logged_hunt.txt", hunt_id);
+
+  int fisier=open(path, O_RDONLY|O_WRONLY|O_CREAT| O_APPEND, 0644);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschidere\n");
+      exit(-1);
+    }
+
+  char buffer[256];
+
+  snprintf(buffer, sizeof(buffer), "S-a efectuat optiunea: %s", operatie);
+
+  if(write(fisier, buffer, strlen(buffer))==-1)
+    {
+      perror("Eroare la scrierea in fisier!\n");
+      exit(-1);
+    }
+  
+  close(fisier);
+}
+
 int main(int argc, char **argv)
 {
   if(argc == 3)
@@ -220,10 +255,12 @@ int main(int argc, char **argv)
       if(strcmp(argv[1],"add")==0)
 	{
 	  add_treasure(argv[2]);
+	  log_file(argv[2], argv[1]);
 	}
       if(strcmp(argv[1], "list")==0)
 	{
 	  list_treasure(argv[2]);
+	  log_file(argv[2], argv[1]);
 	}
       if(strcmp(argv[1],"remove_hunt")==0)
 	{
@@ -235,10 +272,12 @@ int main(int argc, char **argv)
       if(strcmp(argv[1],"view")==0)
 	{
 	  view_treasure(argv[2], argv[3]);
+	  log_file(argv[2], argv[1]);
 	}
       if(strcmp(argv[1], "remove")==0)
 	{
 	  remove_treasure(argv[2], argv[3]);
+	  log_file(argv[2], argv[1]);
 	}
     }
   else
