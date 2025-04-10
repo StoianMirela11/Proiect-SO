@@ -312,6 +312,6 @@ int main(int argc, char **argv)
     {
       perror(NULL);
       exit(-1);
-    }
-  return 0;
+   }
+return 0;
 }
