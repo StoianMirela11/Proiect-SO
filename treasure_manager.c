@@ -26,13 +26,12 @@ typedef struct{
 void add_treasure(char* nume_director)
 {
   struct stat st;
-  if(stat(nume_director, &st)==-1) //daca directorul nu exista
+  if(stat(nume_director, &st)==-1) 
     {
-      //daca directorul nu exista, il facem
-      if(mkdir(nume_director, 0777)==-1) //citire, scriere si executie
+      if(mkdir(nume_director, 0777)==-1)
 	{
 	  perror("Eroare la crearea directorului!\n");
-	  exit(-1);
+	  exit(EXIT_FAILURE);
 	}
     }
 
@@ -45,7 +44,7 @@ void add_treasure(char* nume_director)
   if(file==-1)
     {
       perror("Eroare la deshiderea fisierului");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 
   printf("Introduceti numele vanatorii: ");scanf("%14s", new_treasure.treasure_hunt);
@@ -56,8 +55,8 @@ void add_treasure(char* nume_director)
 
   if(write(file, &new_treasure, sizeof(new_treasure))==-1)
     {
-      perror("ERoare la scrierea in fisier");
-      exit(-1);
+      perror("Eroare la scrierea in fisier");
+      exit(EXIT_FAILURE);
     }
 
   close(file);
@@ -70,18 +69,18 @@ void list_treasure(char* nume_director)
   if(stat(nume_director,&st)==-1)
     {
       perror("Directorul nu exista!");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 
   char path[256];
-  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director); // calea fisierului meu
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director);
 
   struct stat file;
 
   if(stat(path, &file)==-1)
     {
       perror("Eroare! Nu se pot obtine informatii din fisier!");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 
   printf("Numele vanatorii:%s\n", nume_director);
@@ -93,7 +92,7 @@ void list_treasure(char* nume_director)
   if(fisier==-1)
     {
       perror("Eroare la deschiderea pentru citire\n");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
   TREASURE_DATA buffer;
   
@@ -109,8 +108,6 @@ void list_treasure(char* nume_director)
   close(fisier);
   
 }
-//view <hunt_id> <id>: View details of a specific treasure
-//id ul este o comoara anume din fisierul meu de comori
 
 void view_treasure(char* hunt_id, char* id)
 {
@@ -118,10 +115,9 @@ void view_treasure(char* hunt_id, char* id)
   if(stat(hunt_id, &st)==-1)
     {
       printf("Vanatoarea cautata nu exista!\n");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
-  //daca exista directorul, ii gasesc calea si ma mut in el
-
+ 
   char path[256];
   snprintf(path, sizeof(path),"%s/treasure_file.dat", hunt_id);
 
@@ -129,14 +125,14 @@ void view_treasure(char* hunt_id, char* id)
   if(stat(path,&file)==-1)
     {
       perror("Fisierul nu exista!");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
-  //deschidem fisierul
+
   int fisier=open(path, O_RDONLY);
   if(fisier==-1)
     {
       perror("Eroare la deschidere!");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 
   TREASURE_DATA buffer;
@@ -156,56 +152,51 @@ void view_treasure(char* hunt_id, char* id)
   close(fisier);
   
 }
-//hunt_id este denumirea folderului
-//id este denumirea comorii
 
 void remove_treasure(char* hunt_id, char* id)
 {
   struct stat st;
   if(stat(hunt_id, &st)==-1)
   {
-    perror("Vanatoarea nu exista!\n");
-    exit(-1);
+    perror("Vanatoarea nu exista!");
+    exit(EXIT_FAILURE);
   }
 
-  // găsim calea fișierului cu datele
   char path[256];
   snprintf(path, sizeof(path), "%s/treasure_file.dat", hunt_id);
 
   struct stat file;
   if(stat(path, &file)==-1)
   {
-    perror("Fisierul cu comori nu exista\n");
-    exit(-1);
+    perror("Fisierul cu comori nu exista");
+    exit(EXIT_FAILURE);
   }
 
-  // deschidem fișierul vechi
   int fisier = open(path, O_RDWR);
   if(fisier == -1)
   {
-    perror("Eroare la deschiderea fisierului\n");
-    exit(-1);
+    perror("Eroare la deschiderea fisierului");
+    exit(EXIT_FAILURE);
   }
 
-  // creăm fișierul nou
   char new_path[256];
   snprintf(new_path, sizeof(new_path), "%s/new_treasure_file.dat", hunt_id);
   int new_fisier = open(new_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
   if(new_fisier == -1)
   {
-    perror("Eroare la deschiderea pentru scrierea in noul fisier\n");
-    exit(-1);
+    perror("Eroare la deschiderea pentru scrierea in noul fisier");
+    exit(EXIT_FAILURE);
   }
 
   TREASURE_DATA buffer;
   while(read(fisier, &buffer, sizeof(buffer)) > 0)
   {
-    if(strcmp(buffer.treasure_hunt, id) != 0) // dacă nu găsim comoara, o scriem în fișierul nou
+    if(strcmp(buffer.treasure_hunt, id) != 0) 
     {
       if(write(new_fisier, &buffer, sizeof(buffer)) == -1)
       {
-        perror("Eroare la scriere in fisierul nou\n");
-        exit(-1);
+        perror("Eroare la scriere in fisierul nou");
+        exit(EXIT_FAILURE);
       }
     }
   }
@@ -213,68 +204,101 @@ void remove_treasure(char* hunt_id, char* id)
   close(fisier);
   close(new_fisier);
 
-  // ștergem fișierul vechi
   if(remove(path) == -1)
   {
-    perror("Eroare la stergerea fisierului vechi\n");
-    exit(-1);
+    perror("Eroare la stergerea fisierului vechi");
+    exit(EXIT_FAILURE);
   }
 
-  // redenumim fișierul nou
   if(rename(new_path, path) == -1)
   {
     perror("Eroare la redenumirea fisierului nou\n");
-    exit(-1);
+    exit(EXIT_FAILURE);
   }
 }
-
-//creare fisier pentru logg
-
 
 void log_file(char* hunt_id, char* operatie)
 {
   struct stat st;
   if(stat(hunt_id, &st) == -1)
   {
-    perror("Nu exista directorul!\n");
-    exit(-1);
+    perror("Nu exista directorul!");
+    exit(EXIT_FAILURE);
   }
 
   char path[256];
   snprintf(path, sizeof(path), "%s/logged_hunt.txt", hunt_id);
 
-  // Deschidem fișierul de log pentru adăugare
   int fisier = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
   if(fisier == -1)
   {
-    perror("Eroare la deschidere\n");
-    exit(-1);
+    perror("Eroare la deschidere");
+    exit(EXIT_FAILURE);
   }
 
   char buffer[256];
-  char* time_str = strtok(ctime(&st.st_ctime), "\n"); // Eliminăm caracterul de newline
+  char* time_str = strtok(ctime(&st.st_ctime), "\n"); 
   snprintf(buffer, sizeof(buffer), "[%s] S-a efectuat optiunea: %s\n", time_str, operatie);
 
   if(write(fisier, buffer, strlen(buffer)) == -1)
   {
-    perror("Eroare la scrierea in fisier!\n");
-    exit(-1);
+    perror("Eroare la scrierea in fisier!");
+    exit(EXIT_FAILURE);
   }
 
   close(fisier);
 
-  // Realizăm legătura simbolică
   char link_path[256];
   snprintf(link_path, sizeof(link_path), "logged_hunt-%s", hunt_id);
-  if(access(link_path, F_OK) == -1)  // Verificăm dacă legătura simbolică există
+  if(access(link_path, F_OK) == -1)
   {
     if(symlink(path, link_path) == -1)
     {
-      perror("Eroare la creare symlink\n");
+      perror("Eroare la creare symlink");
+      exit(EXIT_FAILURE);
     }
   }
 }
 
+void remove_hunt(char* hunt_id)
+{
+  struct stat st;
+  if(stat(hunt_id,&st)==-1)
+    {
+      perror("Vanatoarea nu exista!");
+      exit(EXIT_FAILURE);
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", hunt_id);
+
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea fisierului de comori!");
+      exit(EXIT_FAILURE);
+    }
+
+  snprintf(path, sizeof(path), "%s/logged_hunt.txt", hunt_id);
+
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea fisierului cu logg!");
+      exit(EXIT_FAILURE);
+    }
+
+  snprintf(path, sizeof(path), "logged_hunt-%s", hunt_id );
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea legaturii simbolice!");
+      exit(EXIT_FAILURE);
+    }
+
+  if(rmdir(hunt_id)==-1)
+    {
+      perror("Eroare la stergerea vanatorii!");
+      exit(EXIT_FAILURE);
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -292,7 +316,7 @@ int main(int argc, char **argv)
 	}
       if(strcmp(argv[1],"remove_hunt")==0)
 	{
-	  //stergem o vanatoare
+	  remove_hunt(argv[2]);
 	}
     }
   else if(argc == 4)
@@ -311,7 +335,7 @@ int main(int argc, char **argv)
   else
     {
       perror(NULL);
-      exit(-1);
+      exit(EXIT_FAILURE);
    }
 return 0;
 }
