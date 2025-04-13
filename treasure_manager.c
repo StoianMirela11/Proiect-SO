@@ -16,12 +16,31 @@ typedef struct
 }COORDINATES;
 
 typedef struct{
-  char treasure_hunt[15];
+  char treasure_id[15];
   char user_name[30];
   COORDINATES gps_coordinates;
   char clue_text[10];
   int value;
 }TREASURE_DATA;
+
+
+int exista_treasure(int fisier, char* nume_treasure)
+{
+  TREASURE_DATA aux;
+
+  lseek(fisier, 0, SEEK_SET);
+
+  while(read(fisier, &aux, sizeof(aux))==sizeof(aux))
+    {
+      if(strcmp(aux.treasure_id, nume_treasure)==0)
+	{
+	  return 1; //comoara exista deja 
+	}
+    }
+
+  return 0;
+}
+
 
 void add_treasure(char* nume_director)
 {
@@ -40,18 +59,28 @@ void add_treasure(char* nume_director)
 
   TREASURE_DATA new_treasure;
 
-  int file=open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+  int file=open(path, O_RDWR | O_CREAT | O_APPEND, 0644);
   if(file==-1)
     {
       perror("Eroare la deshiderea fisierului");
       exit(EXIT_FAILURE);
     }
 
-  printf("Introduceti numele vanatorii: ");scanf("%14s", new_treasure.treasure_hunt);
+  printf("Introduceti numele comorii: ");scanf("%14s", new_treasure.treasure_id);
+
+  if(exista_treasure(file, new_treasure.treasure_id))
+    {
+      printf("Comoara exista deja in fisier!\n");
+      close(file);
+      return;
+    }
+  
   printf("Introduceti user_name: ");scanf("%s", new_treasure.user_name);
   printf("Introduceti coordonatele (latitudine, longitudine):"); scanf("%f %f", &new_treasure.gps_coordinates.latitude, &new_treasure.gps_coordinates.longitude);
   printf("Introduceti indiciul:");scanf("%9s", new_treasure.clue_text);
   printf("Introduceti valoarea:");scanf("%d", &new_treasure.value);
+
+  lseek(file, 0, SEEK_END);
 
   if(write(file, &new_treasure, sizeof(new_treasure))==-1)
     {
@@ -85,7 +114,11 @@ void list_treasure(char* nume_director)
 
   printf("Numele vanatorii:%s\n", nume_director);
   printf("Dimensiunea fisierului:%ld\n", file.st_size);
-  printf("Data ultimei modificari:%ld\n", file.st_mtime);
+
+  struct tm* timp=localtime(&file.st_mtime);
+  char time[100];
+  strftime(time, sizeof(time), "%Y-%m-%d %H:%M:%S", timp);
+  printf("Data ultimei modificari:%s\n", time);
   printf("\n");
 
   int fisier=open(path, O_RDONLY);
@@ -98,7 +131,7 @@ void list_treasure(char* nume_director)
   
   while(read(fisier, &buffer ,sizeof(buffer))>0)
     {
-      printf("Vanatoare:%s\n", buffer.treasure_hunt);
+      printf("Comoara:%s\n", buffer.treasure_id);
       printf("User:%s\n", buffer.user_name);
       printf("Coordonate GPS: %f, %f\n", buffer.gps_coordinates.latitude, buffer.gps_coordinates.longitude);
       printf("Indiciu: %s\n", buffer.clue_text);
@@ -136,12 +169,12 @@ void view_treasure(char* hunt_id, char* id)
     }
 
   TREASURE_DATA buffer;
-  //citesc date de dimensiunea unui TRESURE_DATA
+  
   while(read(fisier, &buffer, sizeof(buffer))>0)
     {
-      if(strcmp(buffer.treasure_hunt, id)==0)
+      if(strcmp(buffer.treasure_id, id)==0)
 	{
-	  printf("Vanatoare:%s\n", buffer.treasure_hunt);
+	  printf("Comoara:%s\n", buffer.treasure_id);
 	  printf("User:%s\n", buffer.user_name);
 	  printf("Coordonate GPS: %f, %f\n", buffer.gps_coordinates.latitude, buffer.gps_coordinates.longitude);
 	  printf("Indiciu: %s\n", buffer.clue_text);
@@ -191,7 +224,7 @@ void remove_treasure(char* hunt_id, char* id)
   TREASURE_DATA buffer;
   while(read(fisier, &buffer, sizeof(buffer)) > 0)
   {
-    if(strcmp(buffer.treasure_hunt, id) != 0) 
+    if(strcmp(buffer.treasure_id, id) != 0) 
     {
       if(write(new_fisier, &buffer, sizeof(buffer)) == -1)
       {
