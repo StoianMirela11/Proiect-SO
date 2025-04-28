@@ -24,6 +24,56 @@ typedef struct{
 }TREASURE_DATA;
 
 
+//functie noua pentru faza a 2a
+
+void list_hunts()
+{
+    struct dirent* intrare;
+    DIR* director = opendir(".");
+    if (director == NULL)
+    {
+        perror("Eroare la deschiderea directorului curent");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((intrare = readdir(director)) != NULL)
+    {
+        if (intrare->d_type == DT_DIR)
+        {
+            // Ignoram "." si ".."
+            if (strcmp(intrare->d_name, ".") == 0 || strcmp(intrare->d_name, "..") == 0)
+                continue;
+
+            char path[512];
+            snprintf(path, sizeof(path), "%s/treasure_file.dat", intrare->d_name);
+
+            if (access(path, F_OK) != -1)
+            {
+                int fisier = open(path, O_RDONLY);
+                if (fisier == -1)
+                {
+                    perror("Eroare la deschiderea fisierului de comori");
+                    continue;
+                }
+
+                int treasure_count = 0;
+                TREASURE_DATA buffer;
+                while (read(fisier, &buffer, sizeof(buffer)) > 0)
+                {
+                    treasure_count++;
+                }
+
+                close(fisier);
+
+                printf("Vanatoare: %s - Numar total de comori: %d\n", intrare->d_name, treasure_count);
+            }
+        }
+    }
+
+    closedir(director);
+}
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 int exista_treasure(int fisier, char* nume_treasure)
 {
   TREASURE_DATA aux;
@@ -335,6 +385,15 @@ void remove_hunt(char* hunt_id)
 
 int main(int argc, char **argv)
 {
+  if(argc==1)
+    {
+      //printf("Monitorul ruleaza cu PID=%d\n", getpid());
+      while(1)
+	{
+	  pause();
+	}
+    }
+  
   if(argc == 3)
     {
       if(strcmp(argv[1],"add")==0)
