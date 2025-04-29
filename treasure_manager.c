@@ -8,6 +8,7 @@
 #include<sys/stat.h>
 #include<fcntl.h>
 #include<time.h>
+#include <signal.h>
 
 typedef struct
 {
@@ -24,7 +25,14 @@ typedef struct{
 }TREASURE_DATA;
 
 
-//functie noua pentru faza a 2a
+//functii noi pentru faza a 2a
+
+volatile sig_atomic_t comanda_primita = 0;
+
+void handle_signal(int sig) {
+  
+  comanda_primita=sig;
+}
 
 void list_hunts()
 {
@@ -72,6 +80,35 @@ void list_hunts()
 
     closedir(director);
 }
+
+void citire_comanda_pentru_procesare()
+{
+  char buffer[256];
+  int citire_comanda;
+  
+  int fisier=open("comenzi.txt", O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschiderea pentru citirea comenzii");
+      exit(EXIT_FAILURE);
+    }
+  citire_comanda=read(fisier, buffer, sizeof(buffer));
+  if(citire_comanda==-1)
+    {
+      perror("Eroare la citirea comenzii din fisier");
+      exit(EXIT_FAILURE);
+    }
+
+  close(fisier);
+  buffer[citire_comanda]='\0';
+  
+  if(strcmp(buffer, "list_hunts")==0)
+    {
+      list_hunts();
+    }
+  
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 int exista_treasure(int fisier, char* nume_treasure)
@@ -385,12 +422,33 @@ void remove_hunt(char* hunt_id)
 
 int main(int argc, char **argv)
 {
-  if(argc==1)
+
+  struct sigaction sa;
+  sa.sa_handler = handle_signal;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+
+  sigaction(SIGUSR1, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+  
+ if(argc==1)
     {
       //printf("Monitorul ruleaza cu PID=%d\n", getpid());
       while(1)
 	{
 	  pause();
+
+	  if(comanda_primita==SIGTERM)
+	    {
+	      printf("Monitorul se va oprii ...\n");
+	      usleep(5000000);
+	      return 0;
+	    }
+	  if (comanda_primita == SIGUSR1 )
+	    {
+	      citire_comanda_pentru_procesare();
+	      comanda_primita = 0; // resetăm doar după ce procesăm
+	    }
 	}
     }
   
