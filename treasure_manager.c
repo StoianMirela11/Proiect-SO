@@ -34,150 +34,6 @@ void handle_signal(int sig) {
   comanda_primita=sig;
 }
 
-void list_hunts()
-{
-    struct dirent* intrare;
-    DIR* director = opendir(".");
-    if (director == NULL)
-    {
-        perror("Eroare la deschiderea directorului curent");
-        exit(EXIT_FAILURE);
-    }
-
-    while ((intrare = readdir(director)) != NULL)
-    {
-        if (intrare->d_type == DT_DIR)
-        {
-            // Ignoram "." si ".."
-            if (strcmp(intrare->d_name, ".") == 0 || strcmp(intrare->d_name, "..") == 0)
-                continue;
-
-            char path[512];
-            snprintf(path, sizeof(path), "%s/treasure_file.dat", intrare->d_name);
-
-            if (access(path, F_OK) != -1)
-            {
-                int fisier = open(path, O_RDONLY);
-                if (fisier == -1)
-                {
-                    perror("Eroare la deschiderea fisierului de comori");
-                    continue;
-                }
-
-                int treasure_count = 0;
-                TREASURE_DATA buffer;
-                while (read(fisier, &buffer, sizeof(buffer)) > 0)
-                {
-                    treasure_count++;
-                }
-
-                close(fisier);
-
-                printf("Vanatoare: %s - Numar total de comori: %d\n", intrare->d_name, treasure_count);
-            }
-        }
-    }
-
-    closedir(director);
-}
-
-void citire_comanda_pentru_procesare()
-{
-  char buffer[256];
-  int citire_comanda;
-  
-  int fisier=open("comenzi.txt", O_RDONLY);
-  if(fisier==-1)
-    {
-      perror("Eroare la deschiderea pentru citirea comenzii");
-      exit(EXIT_FAILURE);
-    }
-  citire_comanda=read(fisier, buffer, sizeof(buffer));
-  if(citire_comanda==-1)
-    {
-      perror("Eroare la citirea comenzii din fisier");
-      exit(EXIT_FAILURE);
-    }
-
-  close(fisier);
-  buffer[citire_comanda]='\0';
-  
-  if(strcmp(buffer, "list_hunts")==0)
-    {
-      list_hunts();
-    }
-  
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-int exista_treasure(int fisier, char* nume_treasure)
-{
-  TREASURE_DATA aux;
-
-  lseek(fisier, 0, SEEK_SET);
-
-  while(read(fisier, &aux, sizeof(aux))==sizeof(aux))
-    {
-      if(strcmp(aux.treasure_id, nume_treasure)==0)
-	{
-	  return 1; //comoara exista deja 
-	}
-    }
-
-  return 0;
-}
-
-
-void add_treasure(char* nume_director)
-{
-  struct stat st;
-  if(stat(nume_director, &st)==-1) 
-    {
-      if(mkdir(nume_director, 0777)==-1)
-	{
-	  perror("Eroare la crearea directorului!\n");
-	  exit(EXIT_FAILURE);
-	}
-    }
-
-  char path[256];
-  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director);
-
-  TREASURE_DATA new_treasure;
-
-  int file=open(path, O_RDWR | O_CREAT | O_APPEND, 0644);
-  if(file==-1)
-    {
-      perror("Eroare la deshiderea fisierului");
-      exit(EXIT_FAILURE);
-    }
-
-  printf("Introduceti numele comorii: ");scanf("%14s", new_treasure.treasure_id);
-
-  if(exista_treasure(file, new_treasure.treasure_id))
-    {
-      printf("Comoara exista deja in fisier!\n");
-      close(file);
-      return;
-    }
-  
-  printf("Introduceti user_name: ");scanf("%s", new_treasure.user_name);
-  printf("Introduceti coordonatele (latitudine, longitudine):"); scanf("%f %f", &new_treasure.gps_coordinates.latitude, &new_treasure.gps_coordinates.longitude);
-  printf("Introduceti indiciul:");scanf("%9s", new_treasure.clue_text);
-  printf("Introduceti valoarea:");scanf("%d", &new_treasure.value);
-
-  lseek(file, 0, SEEK_END);
-
-  if(write(file, &new_treasure, sizeof(new_treasure))==-1)
-    {
-      perror("Eroare la scrierea in fisier");
-      exit(EXIT_FAILURE);
-    }
-
-  close(file);
-}
-
 void list_treasure(char* nume_director)
 {
   struct stat st;
@@ -272,6 +128,165 @@ void view_treasure(char* hunt_id, char* id)
   close(fisier);
   
 }
+
+void list_hunts()
+{
+    struct dirent* intrare;
+    DIR* director = opendir(".");
+    if (director == NULL)
+    {
+        perror("Eroare la deschiderea directorului curent");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((intrare = readdir(director)) != NULL)
+    {
+        if (intrare->d_type == DT_DIR)
+        {
+            // Ignoram "." si ".."
+            if (strcmp(intrare->d_name, ".") == 0 || strcmp(intrare->d_name, "..") == 0)
+                continue;
+
+            char path[512];
+            snprintf(path, sizeof(path), "%s/treasure_file.dat", intrare->d_name);
+
+            if (access(path, F_OK) != -1)
+            {
+                int fisier = open(path, O_RDONLY);
+                if (fisier == -1)
+                {
+                    perror("Eroare la deschiderea fisierului de comori");
+                    continue;
+                }
+
+                int treasure_count = 0;
+                TREASURE_DATA buffer;
+                while (read(fisier, &buffer, sizeof(buffer)) > 0)
+                {
+                    treasure_count++;
+                }
+
+                close(fisier);
+
+                printf("Vanatoare: %s - Numar total de comori: %d\n", intrare->d_name, treasure_count);
+            }
+        }
+    }
+
+    closedir(director);
+}
+
+void citire_comanda_pentru_procesare()
+{
+  char buffer[256];
+  int citire_comanda;
+
+  
+  int fisier=open("comenzi.txt", O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschiderea pentru citirea comenzii");
+      exit(EXIT_FAILURE);
+    }
+  citire_comanda=read(fisier, buffer, sizeof(buffer));
+  if(citire_comanda==-1)
+    {
+      perror("Eroare la citirea comenzii din fisier");
+      exit(EXIT_FAILURE);
+    }
+
+  close(fisier);
+  buffer[citire_comanda]='\0';
+
+  char comanda[20]; char hunt[20]; char treasure[20];
+  sscanf(buffer, "%s %s %s", comanda, hunt, treasure);
+  
+  if(strcmp(comanda, "list_hunts")==0)
+    {
+      list_hunts();
+    }
+  else if(strcmp(comanda, "list_treasures")==0)
+    {
+      sscanf(buffer, "%s %s", comanda, hunt);
+      list_treasure(hunt);
+    }
+  else if(strcmp(comanda, "view_treasure")==0)
+    {
+      sscanf(buffer, "%s %s %s", comanda, hunt, treasure);
+      view_treasure(hunt, treasure);
+    }
+  
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+int exista_treasure(int fisier, char* nume_treasure)
+{
+  TREASURE_DATA aux;
+
+  lseek(fisier, 0, SEEK_SET);
+
+  while(read(fisier, &aux, sizeof(aux))==sizeof(aux))
+    {
+      if(strcmp(aux.treasure_id, nume_treasure)==0)
+	{
+	  return 1; //comoara exista deja 
+	}
+    }
+
+  return 0;
+}
+
+
+void add_treasure(char* nume_director)
+{
+  struct stat st;
+  if(stat(nume_director, &st)==-1) 
+    {
+      if(mkdir(nume_director, 0777)==-1)
+	{
+	  perror("Eroare la crearea directorului!\n");
+	  exit(EXIT_FAILURE);
+	}
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director);
+
+  TREASURE_DATA new_treasure;
+
+  int file=open(path, O_RDWR | O_CREAT | O_APPEND, 0644);
+  if(file==-1)
+    {
+      perror("Eroare la deshiderea fisierului");
+      exit(EXIT_FAILURE);
+    }
+
+  printf("Introduceti numele comorii: ");scanf("%14s", new_treasure.treasure_id);
+
+  if(exista_treasure(file, new_treasure.treasure_id))
+    {
+      printf("Comoara exista deja in fisier!\n");
+      close(file);
+      return;
+    }
+  
+  printf("Introduceti user_name: ");scanf("%s", new_treasure.user_name);
+  printf("Introduceti coordonatele (latitudine, longitudine):"); scanf("%f %f", &new_treasure.gps_coordinates.latitude, &new_treasure.gps_coordinates.longitude);
+  printf("Introduceti indiciul:");scanf("%9s", new_treasure.clue_text);
+  printf("Introduceti valoarea:");scanf("%d", &new_treasure.value);
+
+  lseek(file, 0, SEEK_END);
+
+  if(write(file, &new_treasure, sizeof(new_treasure))==-1)
+    {
+      perror("Eroare la scrierea in fisier");
+      exit(EXIT_FAILURE);
+    }
+
+  close(file);
+}
+
 
 void remove_treasure(char* hunt_id, char* id)
 {
@@ -430,6 +445,7 @@ int main(int argc, char **argv)
 
   sigaction(SIGUSR1, &sa, NULL);
   sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGUSR2, &sa, NULL);
   
  if(argc==1)
     {
@@ -444,7 +460,7 @@ int main(int argc, char **argv)
 	      usleep(5000000);
 	      return 0;
 	    }
-	  if (comanda_primita == SIGUSR1 )
+	  if (comanda_primita == SIGUSR1 || comanda_primita == SIGUSR2)
 	    {
 	      citire_comanda_pentru_procesare();
 	      comanda_primita = 0; // resetăm doar după ce procesăm
