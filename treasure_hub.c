@@ -8,6 +8,22 @@
 #include <errno.h>
 
 pid_t monitor_pid=0;
+int necesita_monitor=0;
+
+typedef struct
+{
+  float latitude;
+  float longitude;
+}COORDINATES;
+
+typedef struct{
+  char treasure_id[15];
+  char user_name[30];
+  COORDINATES gps_coordinates;
+  char clue_text[10];
+  int value;
+}TREASURE_DATA;
+
 
 void meniu()
 {
@@ -110,56 +126,12 @@ int main()
 	  exit(EXIT_FAILURE);
 	}
       command[strcspn(command, "\n")]=0; //stergem caracterul de \n
-
+      
       if(strcmp(command,"start_monitor")==0)
 	{
 	  start_monitor();
 	}
-      else if (strcmp(command, "list_hunts")==0)
-	{
-	  trimite_comanda("list_hunts", SIGUSR1);
-	}
-      else if(strcmp(command, "list_treasures")==0)
-	{
-	  char vanatoare[20];
-	  printf("Introdu numele vanatorii: ");
-	  if(fgets(vanatoare, sizeof(vanatoare), stdin)==NULL)
-	    {
-	      perror("Eroare la citirea vanatorii");
-	      exit(EXIT_FAILURE);
-	    }
-	  vanatoare[strcspn(vanatoare,"\n")]=0;
-	  char comanda_completa[128];
-	  snprintf(comanda_completa, sizeof(comanda_completa), "list_treasures %s", vanatoare);
-	  trimite_comanda(comanda_completa, SIGUSR1);
-	}
-      else if(strcmp(command, "view_treasure")==0)
-	{
-	  char vanatoare[20];
-	  char comoara[20];
-	  printf("Introdu numele vanatorii: ");
-	  if(fgets(vanatoare, sizeof(vanatoare), stdin)==NULL)
-	    {
-	      perror("Eroare la citirea vanatorii");
-	      exit(EXIT_FAILURE);
-	    }
-	  vanatoare[strcspn(vanatoare,"\n")]=0;
-	  printf("Introdu numele comorii: ");
-	  if(fgets(comoara, sizeof(comoara), stdin)==NULL)
-	    {
-	      perror("Eroare la citirea comorii");
-	      exit(EXIT_FAILURE);
-	    }
-	  comoara[strcspn(comoara, "\n")]=0;
-	  char comanda_completa[128];
-	  snprintf(comanda_completa, sizeof(comanda_completa), "view_treasure %s %s", vanatoare, comoara);
-	  trimite_comanda(comanda_completa, SIGUSR2);
-	}
-      else if(strcmp(command, "stop_monitor")==0)
-	{
-	  trimite_comanda(command, SIGTERM);
-	}
-      else if(strcmp(command, "exit")==0)
+       else if(strcmp(command, "exit")==0)
 	{
 	  if(monitor_pid!=0 && kill(monitor_pid, 0)==0)
 	    {
@@ -170,6 +142,112 @@ int main()
 	      printf("Programul s-a inchis!\n");
 	      exit(0);
 	    }
+	}
+       else if(monitor_pid==0)
+	 {
+	   printf("Monitorul nu ruleaza. Operatia nu poate fi efectuata.\n");
+	   continue;
+	 }
+      else if (strcmp(command, "list_hunts")==0)
+	{
+	  trimite_comanda("list_hunts", SIGUSR1);
+	}
+      else if(strcmp(command, "list_treasures")==0)
+	{
+	  char vanatoare[20];
+
+	  while(1)
+	    {
+	      printf("Introdu numele vanatorii: ");
+	      if(fgets(vanatoare, sizeof(vanatoare), stdin)==NULL)
+		{
+		  perror("Eroare la citirea vanatorii");
+		  exit(EXIT_FAILURE);
+		}
+	      vanatoare[strcspn(vanatoare,"\n")]=0;
+
+	      if(access(vanatoare, F_OK)==-1)
+		{
+		  printf("Vanatoarea nu exista!\nIntroduceti o alta vanatoare valida.\n");
+		}
+	      else
+		{
+		  break;
+		}
+	    }
+	  char comanda_completa[128];
+	  snprintf(comanda_completa, sizeof(comanda_completa), "list_treasures %s", vanatoare);
+	  trimite_comanda(comanda_completa, SIGUSR1);
+	}
+      else if(strcmp(command, "view_treasure")==0)
+	{
+	  char vanatoare[20];
+	  char comoara[20];
+
+	  while(1)
+	    {
+	      printf("Introdu numele vanatorii: ");
+	      if(fgets(vanatoare, sizeof(vanatoare), stdin)==NULL)
+		{
+		  perror("Eroare la citirea vanatorii");
+		  exit(EXIT_FAILURE);
+		}
+	      vanatoare[strcspn(vanatoare,"\n")]=0;
+	      if(access(vanatoare, F_OK)==-1)
+		{
+		  printf("Vanatoarea nu exista!\nIntroduceti o alta vanatoare valida.\n");
+		}
+	      else
+		{
+		  break;
+		}
+	    }
+
+	      //deschidem fisierul de comori ca sa verificam daca comoara data de la tastatura exista pentru a afisa date
+	      char path[256];
+	      snprintf(path, sizeof(path), "%s/treasure_file.dat", vanatoare);
+	      int fisier=open(path, O_RDONLY);
+	      if(fisier==-1)
+		{
+		  perror("Eroare la deschiderea fisierului.\n");
+		  exit(EXIT_FAILURE);
+		}
+
+	      while(1)
+		{
+		  printf("Introdu numele comorii: ");
+		  if(fgets(comoara, sizeof(comoara), stdin)==NULL)
+		    {
+		      perror("Eroare la citirea comorii");
+		      exit(EXIT_FAILURE);
+		    }
+		  comoara[strcspn(comoara, "\n")]=0;
+		  TREASURE_DATA buffer;
+		  int gasit=0;
+		  while(read(fisier, &buffer, sizeof(buffer))>0)
+		    {
+		      if(strcmp(buffer.treasure_id, comoara)==0)
+			{
+			  gasit=1;
+			  break;
+			}
+		    }
+		  if(gasit)
+		    {
+		      break;
+		    }
+		  else
+		    {
+		      printf("Comoara nu exista.\nIntroduceti un al nume de comoara.\n");
+		    }
+		}
+	  char comanda_completa[128];
+	  snprintf(comanda_completa, sizeof(comanda_completa), "view_treasure %s %s", vanatoare, comoara);
+	  trimite_comanda(comanda_completa, SIGUSR2);
+	}
+      else if(strcmp(command, "stop_monitor")==0)
+	{
+	  trimite_comanda(command, SIGTERM);
 	}
       else
 	{

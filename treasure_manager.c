@@ -38,6 +38,8 @@ void list_treasure(char* nume_director)
 {
   struct stat st;
 
+  char nume_director_nou[200];
+
   if(stat(nume_director,&st)==-1)
     {
       perror("Directorul nu exista!");
