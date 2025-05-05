@@ -6,6 +6,10 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+
 
 pid_t monitor_pid=0;
 int necesita_monitor=0;
@@ -44,6 +48,76 @@ void sigchld_handler(int sig)
       printf("Monitorul s-a terminat cu codul %d\n", WEXITSTATUS(status));
     }
   monitor_pid=0;
+}
+
+void semnal_monitor_terminat(int sig)
+{
+  // Doar deblocheaza pause()
+}
+
+void listeaza_treasures(char* nume_director)
+{
+  struct stat st;
+  if(stat(nume_director, &st)==-1)
+    {
+      printf("Vanatoarea cautata nu exista!\n");
+      exit(EXIT_FAILURE);
+    }
+ 
+  char path[256];
+  snprintf(path, sizeof(path),"%s/treasure_file.dat", nume_director);
+
+  struct stat file;
+  if(stat(path,&file)==-1)
+    {
+      perror("Fisierul nu exista!");
+      exit(EXIT_FAILURE);
+    }
+
+  int fisier=open(path, O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschidere!");
+      exit(EXIT_FAILURE);
+    }
+
+  TREASURE_DATA buffer;
+  
+  while(read(fisier, &buffer, sizeof(buffer))>0)
+    {
+	  printf("Comoara:%s\n", buffer.treasure_id);
+    }
+  close(fisier);
+}
+
+void listeaza_hunts()
+{
+    struct dirent* intrare;
+    DIR* director = opendir(".");
+    if (director == NULL)
+    {
+        perror("Eroare la deschiderea directorului curent");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((intrare = readdir(director)) != NULL)
+    {
+        if (intrare->d_type == DT_DIR)
+        {
+            // Ignoram "." si ".."
+            if (intrare->d_name[0] == '.')
+	      {
+                continue;
+	      }
+	    else
+	      {
+		printf("%s\n", intrare->d_name);
+	      }
+
+        }
+    }
+    closedir(director);
+
 }
 
 void start_monitor()
@@ -109,6 +183,13 @@ int main()
   //memset(&sa, 0x00, sizeof(struct sigaction));
 
   sigaction(SIGCHLD, &sa, NULL);
+
+  struct sigaction sa_usr2;
+  sa_usr2.sa_handler = semnal_monitor_terminat;
+  sigemptyset(&sa_usr2.sa_mask);
+  sa_usr2.sa_flags = 0;
+
+  sigaction(SIGUSR2, &sa_usr2, NULL);
   
   char command[256];
   while(1)
@@ -151,9 +232,12 @@ int main()
       else if (strcmp(command, "list_hunts")==0)
 	{
 	  trimite_comanda("list_hunts", SIGUSR1);
+	  pause();
 	}
       else if(strcmp(command, "list_treasures")==0)
 	{
+	  printf("Lista de vanatori este:\n");
+	  listeaza_hunts();
 	  char vanatoare[20];
 
 	  while(1)
@@ -178,11 +262,15 @@ int main()
 	  char comanda_completa[128];
 	  snprintf(comanda_completa, sizeof(comanda_completa), "list_treasures %s", vanatoare);
 	  trimite_comanda(comanda_completa, SIGUSR1);
+	  pause();
 	}
       else if(strcmp(command, "view_treasure")==0)
 	{
 	  char vanatoare[20];
 	  char comoara[20];
+
+	  printf("Lista de vanatori este:\n");
+	  listeaza_hunts();
 
 	  while(1)
 	    {
@@ -213,6 +301,9 @@ int main()
 		  exit(EXIT_FAILURE);
 		}
 
+	      printf("Lista de comori este:\n");
+	      listeaza_treasures(vanatoare);
+	      
 	      while(1)
 		{
 		  printf("Introdu numele comorii: ");
@@ -226,7 +317,8 @@ int main()
 		  int gasit=0;
 		  while(read(fisier, &buffer, sizeof(buffer))>0)
 		    {
-		      if(strcmp(buffer.treasure_id, comoara)==0)
+		      if(strncmp(buffer.treasure_id, comoara, strlen(comoara)) == 0)
+
 			{
 			  gasit=1;
 			  break;
@@ -238,12 +330,13 @@ int main()
 		    }
 		  else
 		    {
-		      printf("Comoara nu exista.\nIntroduceti un al nume de comoara.\n");
+		      printf("Comoara nu exista.\nIntroduceti un alt nume de comoara.\n");
 		    }
 		}
 	  char comanda_completa[128];
 	  snprintf(comanda_completa, sizeof(comanda_completa), "view_treasure %s %s", vanatoare, comoara);
 	  trimite_comanda(comanda_completa, SIGUSR2);
+	  pause();
 	}
       else if(strcmp(command, "stop_monitor")==0)
 	{

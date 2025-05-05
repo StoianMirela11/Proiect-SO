@@ -34,11 +34,10 @@ void handle_signal(int sig) {
   comanda_primita=sig;
 }
 
+
 void list_treasure(char* nume_director)
 {
   struct stat st;
-
-  char nume_director_nou[200];
 
   if(stat(nume_director,&st)==-1)
     {
@@ -84,6 +83,7 @@ void list_treasure(char* nume_director)
       printf("\n");
     }
   close(fisier);
+  kill(getppid(), SIGUSR2);
   
 }
 
@@ -128,6 +128,7 @@ void view_treasure(char* hunt_id, char* id)
 	}
     }
   close(fisier);
+  kill(getppid(), SIGUSR2);
   
 }
 
@@ -176,6 +177,7 @@ void list_hunts()
     }
 
     closedir(director);
+    kill(getppid(), SIGUSR2);
 }
 
 void citire_comanda_pentru_procesare()
