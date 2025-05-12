@@ -1,0 +1,511 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<dirent.h>
+#include<unistd.h>
+#include<errno.h>
+#include<sys/types.h>e
+#include<sys/stat.h>
+#include<fcntl.h>
+#include<time.h>
+#include <signal.h>
+
+typedef struct
+{
+  float latitude;
+  float longitude;
+}COORDINATES;
+
+typedef struct{
+  char treasure_id[15];
+  char user_name[30];
+  COORDINATES gps_coordinates;
+  char clue_text[10];
+  int value;
+}TREASURE_DATA;
+
+
+//functii noi pentru faza a 2a
+
+volatile sig_atomic_t comanda_primita = 0;
+
+void handle_signal(int sig) {
+  
+  comanda_primita=sig;
+}
+
+
+void list_treasure(char* nume_director)
+{
+  struct stat st;
+
+  if(stat(nume_director,&st)==-1)
+    {
+      perror("Directorul nu exista!");
+      exit(EXIT_FAILURE);
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director);
+
+  struct stat file;
+
+  if(stat(path, &file)==-1)
+    {
+      perror("Eroare! Nu se pot obtine informatii din fisier!");
+      exit(EXIT_FAILURE);
+    }
+
+  printf("Numele vanatorii:%s\n", nume_director);
+  printf("Dimensiunea fisierului:%ld\n", file.st_size);
+
+  struct tm* timp=localtime(&file.st_mtime);
+  char time[100];
+  strftime(time, sizeof(time), "%Y-%m-%d %H:%M:%S", timp);
+  printf("Data ultimei modificari:%s\n", time);
+  printf("\n");
+
+  int fisier=open(path, O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschiderea pentru citire\n");
+      exit(EXIT_FAILURE);
+    }
+  TREASURE_DATA buffer;
+  
+  while(read(fisier, &buffer ,sizeof(buffer))>0)
+    {
+      printf("Comoara:%s\n", buffer.treasure_id);
+      printf("User:%s\n", buffer.user_name);
+      printf("Coordonate GPS: %f, %f\n", buffer.gps_coordinates.latitude, buffer.gps_coordinates.longitude);
+      printf("Indiciu: %s\n", buffer.clue_text);
+      printf("Valoare: %d\n", buffer.value);
+      printf("\n");
+    }
+  close(fisier);
+  kill(getppid(), SIGUSR2);
+  
+}
+
+void view_treasure(char* hunt_id, char* id)
+{
+  struct stat st;
+  if(stat(hunt_id, &st)==-1)
+    {
+      printf("Vanatoarea cautata nu exista!\n");
+      exit(EXIT_FAILURE);
+    }
+ 
+  char path[256];
+  snprintf(path, sizeof(path),"%s/treasure_file.dat", hunt_id);
+
+  struct stat file;
+  if(stat(path,&file)==-1)
+    {
+      perror("Fisierul nu exista!");
+      exit(EXIT_FAILURE);
+    }
+
+  int fisier=open(path, O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschidere!");
+      exit(EXIT_FAILURE);
+    }
+
+  TREASURE_DATA buffer;
+  
+  while(read(fisier, &buffer, sizeof(buffer))>0)
+    {
+      if(strcmp(buffer.treasure_id, id)==0)
+	{
+	  printf("Comoara:%s\n", buffer.treasure_id);
+	  printf("User:%s\n", buffer.user_name);
+	  printf("Coordonate GPS: %f, %f\n", buffer.gps_coordinates.latitude, buffer.gps_coordinates.longitude);
+	  printf("Indiciu: %s\n", buffer.clue_text);
+	  printf("Valoare: %d\n", buffer.value);
+	  printf("\n");
+	}
+    }
+  close(fisier);
+  kill(getppid(), SIGUSR2);
+  
+}
+
+void list_hunts()
+{
+    struct dirent* intrare;
+    DIR* director = opendir(".");
+    if (director == NULL)
+    {
+        perror("Eroare la deschiderea directorului curent");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((intrare = readdir(director)) != NULL)
+    {
+        if (intrare->d_type == DT_DIR)
+        {
+            // Ignoram "." si ".."
+            if (strcmp(intrare->d_name, ".") == 0 || strcmp(intrare->d_name, "..") == 0)
+                continue;
+
+            char path[512];
+            snprintf(path, sizeof(path), "%s/treasure_file.dat", intrare->d_name);
+
+            if (access(path, F_OK) != -1)
+            {
+                int fisier = open(path, O_RDONLY);
+                if (fisier == -1)
+                {
+                    perror("Eroare la deschiderea fisierului de comori");
+                    continue;
+                }
+
+                int treasure_count = 0;
+                TREASURE_DATA buffer;
+                while (read(fisier, &buffer, sizeof(buffer)) > 0)
+                {
+                    treasure_count++;
+                }
+
+                close(fisier);
+
+                printf("Vanatoare: %s - Numar total de comori: %d\n", intrare->d_name, treasure_count);
+            }
+        }
+    }
+
+    closedir(director);
+    kill(getppid(), SIGUSR2);
+}
+
+void citire_comanda_pentru_procesare()
+{
+  char buffer[256];
+  int citire_comanda;
+
+  
+  int fisier=open("comenzi.txt", O_RDONLY);
+  if(fisier==-1)
+    {
+      perror("Eroare la deschiderea pentru citirea comenzii");
+      exit(EXIT_FAILURE);
+    }
+  citire_comanda=read(fisier, buffer, sizeof(buffer));
+  if(citire_comanda==-1)
+    {
+      perror("Eroare la citirea comenzii din fisier");
+      exit(EXIT_FAILURE);
+    }
+
+  close(fisier);
+  buffer[citire_comanda]='\0';
+
+  char comanda[20]; char hunt[20]; char treasure[20];
+  sscanf(buffer, "%s %s %s", comanda, hunt, treasure);
+  
+  if(strcmp(comanda, "list_hunts")==0)
+    {
+      list_hunts();
+    }
+  else if(strcmp(comanda, "list_treasures")==0)
+    {
+      sscanf(buffer, "%s %s", comanda, hunt);
+      list_treasure(hunt);
+    }
+  else if(strcmp(comanda, "view_treasure")==0)
+    {
+      sscanf(buffer, "%s %s %s", comanda, hunt, treasure);
+      view_treasure(hunt, treasure);
+    }
+  
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+int exista_treasure(int fisier, char* nume_treasure)
+{
+  TREASURE_DATA aux;
+
+  lseek(fisier, 0, SEEK_SET);
+
+  while(read(fisier, &aux, sizeof(aux))==sizeof(aux))
+    {
+      if(strcmp(aux.treasure_id, nume_treasure)==0)
+	{
+	  return 1; //comoara exista deja 
+	}
+    }
+
+  return 0;
+}
+
+
+void add_treasure(char* nume_director)
+{
+  struct stat st;
+  if(stat(nume_director, &st)==-1) 
+    {
+      if(mkdir(nume_director, 0777)==-1)
+	{
+	  perror("Eroare la crearea directorului!\n");
+	  exit(EXIT_FAILURE);
+	}
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", nume_director);
+
+  TREASURE_DATA new_treasure;
+
+  int file=open(path, O_RDWR | O_CREAT | O_APPEND, 0644);
+  if(file==-1)
+    {
+      perror("Eroare la deshiderea fisierului");
+      exit(EXIT_FAILURE);
+    }
+
+  printf("Introduceti numele comorii: ");scanf("%14s", new_treasure.treasure_id);
+
+  if(exista_treasure(file, new_treasure.treasure_id))
+    {
+      printf("Comoara exista deja in fisier!\n");
+      close(file);
+      return;
+    }
+  
+  printf("Introduceti user_name: ");scanf("%s", new_treasure.user_name);
+  printf("Introduceti coordonatele (latitudine, longitudine):"); scanf("%f %f", &new_treasure.gps_coordinates.latitude, &new_treasure.gps_coordinates.longitude);
+  printf("Introduceti indiciul:");scanf("%9s", new_treasure.clue_text);
+  printf("Introduceti valoarea:");scanf("%d", &new_treasure.value);
+
+  lseek(file, 0, SEEK_END);
+
+  if(write(file, &new_treasure, sizeof(new_treasure))==-1)
+    {
+      perror("Eroare la scrierea in fisier");
+      exit(EXIT_FAILURE);
+    }
+
+  close(file);
+}
+
+
+void remove_treasure(char* hunt_id, char* id)
+{
+  struct stat st;
+  if(stat(hunt_id, &st)==-1)
+  {
+    perror("Vanatoarea nu exista!");
+    exit(EXIT_FAILURE);
+  }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", hunt_id);
+
+  struct stat file;
+  if(stat(path, &file)==-1)
+  {
+    perror("Fisierul cu comori nu exista");
+    exit(EXIT_FAILURE);
+  }
+
+  int fisier = open(path, O_RDWR);
+  if(fisier == -1)
+  {
+    perror("Eroare la deschiderea fisierului");
+    exit(EXIT_FAILURE);
+  }
+
+  char new_path[256];
+  snprintf(new_path, sizeof(new_path), "%s/new_treasure_file.dat", hunt_id);
+  int new_fisier = open(new_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if(new_fisier == -1)
+  {
+    perror("Eroare la deschiderea pentru scrierea in noul fisier");
+    exit(EXIT_FAILURE);
+  }
+
+  TREASURE_DATA buffer;
+  while(read(fisier, &buffer, sizeof(buffer)) > 0)
+  {
+    if(strcmp(buffer.treasure_id, id) != 0) 
+    {
+      if(write(new_fisier, &buffer, sizeof(buffer)) == -1)
+      {
+        perror("Eroare la scriere in fisierul nou");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+
+  close(fisier);
+  close(new_fisier);
+
+  if(remove(path) == -1)
+  {
+    perror("Eroare la stergerea fisierului vechi");
+    exit(EXIT_FAILURE);
+  }
+
+  if(rename(new_path, path) == -1)
+  {
+    perror("Eroare la redenumirea fisierului nou\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void log_file(char* hunt_id, char* operatie)
+{
+  struct stat st;
+  if(stat(hunt_id, &st) == -1)
+  {
+    perror("Nu exista directorul!");
+    exit(EXIT_FAILURE);
+  }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/logged_hunt.txt", hunt_id);
+
+  int fisier = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+  if(fisier == -1)
+  {
+    perror("Eroare la deschidere");
+    exit(EXIT_FAILURE);
+  }
+
+  char buffer[256];
+  char* time_str = strtok(ctime(&st.st_ctime), "\n"); 
+  snprintf(buffer, sizeof(buffer), "[%s] S-a efectuat optiunea: %s\n", time_str, operatie);
+
+  if(write(fisier, buffer, strlen(buffer)) == -1)
+  {
+    perror("Eroare la scrierea in fisier!");
+    exit(EXIT_FAILURE);
+  }
+
+  close(fisier);
+
+  char link_path[256];
+  snprintf(link_path, sizeof(link_path), "logged_hunt-%s", hunt_id);
+  if(access(link_path, F_OK) == -1)
+  {
+    if(symlink(path, link_path) == -1)
+    {
+      perror("Eroare la creare symlink");
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
+void remove_hunt(char* hunt_id)
+{
+  struct stat st;
+  if(stat(hunt_id,&st)==-1)
+    {
+      perror("Vanatoarea nu exista!");
+      exit(EXIT_FAILURE);
+    }
+
+  char path[256];
+  snprintf(path, sizeof(path), "%s/treasure_file.dat", hunt_id);
+
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea fisierului de comori!");
+      exit(EXIT_FAILURE);
+    }
+
+  snprintf(path, sizeof(path), "%s/logged_hunt.txt", hunt_id);
+
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea fisierului cu logg!");
+      exit(EXIT_FAILURE);
+    }
+
+  snprintf(path, sizeof(path), "logged_hunt-%s", hunt_id );
+  if(remove(path)==-1)
+    {
+      perror("Eroare la stergerea legaturii simbolice!");
+      exit(EXIT_FAILURE);
+    }
+
+  if(rmdir(hunt_id)==-1)
+    {
+      perror("Eroare la stergerea vanatorii!");
+      exit(EXIT_FAILURE);
+    }
+}
+
+int main(int argc, char **argv)
+{
+
+  struct sigaction sa;
+  sa.sa_handler = handle_signal;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+
+  sigaction(SIGUSR1, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGUSR2, &sa, NULL);
+  
+ if(argc==1)
+    {
+      //printf("Monitorul ruleaza cu PID=%d\n", getpid());
+      while(1)
+	{
+	  pause();
+
+	  if(comanda_primita==SIGTERM)
+	    {
+	      printf("Monitorul se va oprii ...\n");
+	      usleep(5000000);
+	      return 0;
+	    }
+	  if (comanda_primita == SIGUSR1 || comanda_primita == SIGUSR2)
+	    {
+	      citire_comanda_pentru_procesare();
+	      comanda_primita = 0; // resetăm doar după ce procesăm
+	    }
+	}
+    }
+  
+  if(argc == 3)
+    {
+      if(strcmp(argv[1],"add")==0)
+	{
+	  add_treasure(argv[2]);
+	  log_file(argv[2], argv[1]);
+	}
+      if(strcmp(argv[1], "list")==0)
+	{
+	  list_treasure(argv[2]);
+	  log_file(argv[2], argv[1]);
+	}
+      if(strcmp(argv[1],"remove_hunt")==0)
+	{
+	  remove_hunt(argv[2]);
+	}
+    }
+  else if(argc == 4)
+    {
+      if(strcmp(argv[1],"view")==0)
+	{
+	  view_treasure(argv[2], argv[3]);
+	  log_file(argv[2], argv[1]);
+	}
+      if(strcmp(argv[1], "remove")==0)
+	{
+	  remove_treasure(argv[2], argv[3]);
+	  log_file(argv[2], argv[1]);
+	}
+    }
+  else
+    {
+      perror(NULL);
+      exit(EXIT_FAILURE);
+   }
+return 0;
+}
