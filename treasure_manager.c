@@ -442,6 +442,7 @@ void remove_hunt(char* hunt_id)
 int main(int argc, char **argv)
 {
 
+  setbuf(stdout, NULL);
   struct sigaction sa;
   sa.sa_handler = handle_signal;
   sigemptyset(&sa.sa_mask);

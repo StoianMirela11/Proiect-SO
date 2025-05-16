@@ -13,6 +13,7 @@
 
 pid_t monitor_pid=0;
 int necesita_monitor=0;
+int monitor_pipe[2];
 
 typedef struct
 {
@@ -122,6 +123,11 @@ void listeaza_hunts()
 
 void start_monitor()
 {
+  if(pipe(monitor_pipe)<0)
+    {
+      perror("Eroare la crearea pipe-ului\n");
+      exit(1);
+    }
   monitor_pid=fork();
 
   if(monitor_pid < 0)
@@ -131,12 +137,36 @@ void start_monitor()
     }
   if(monitor_pid==0)
     {
+      dup2(monitor_pipe[1], STDOUT_FILENO); // se inlocuieste iesirea standard stdout
+      close(monitor_pipe[0]);
+      close(monitor_pipe[1]);
       execl("./treasure_manager", "./treasure_manager", NULL);//un nou proces care sa ruleze un program diferit de cel al parintelui
       perror("Eroare la crearea unui nou proces");
       exit(EXIT_FAILURE);
     }
   //codul parintelui
+  close(monitor_pipe[1]);
   printf("Monitorul a fost deschid cu PID: %d\n",monitor_pid);
+}
+
+//functie care citeste liniile redirectate prin pipe
+void citeste_din_monitor() {
+    char buffer[256];
+    int n;
+
+    // Temporar setează pipe-ul ca non-blocking
+    int flags = fcntl(monitor_pipe[0], F_GETFL);
+    fcntl(monitor_pipe[0], F_SETFL, flags | O_NONBLOCK);
+
+    usleep(100000);  // mică pauză pentru ca monitorul să apuce să scrie
+
+    while ((n = read(monitor_pipe[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[n] = '\0';
+        printf("%s", buffer);
+    }
+
+    // Restaurăm comportamentul original
+    fcntl(monitor_pipe[0], F_SETFL, flags);
 }
 
 void comenzi(char* command)
@@ -233,6 +263,7 @@ int main()
 	{
 	  trimite_comanda("list_hunts", SIGUSR1);
 	  pause();
+	  citeste_din_monitor();
 	}
       else if(strcmp(command, "list_treasures")==0)
 	{
@@ -263,6 +294,7 @@ int main()
 	  snprintf(comanda_completa, sizeof(comanda_completa), "list_treasures %s", vanatoare);
 	  trimite_comanda(comanda_completa, SIGUSR1);
 	  pause();
+	  citeste_din_monitor();
 	}
       else if(strcmp(command, "view_treasure")==0)
 	{
@@ -337,10 +369,12 @@ int main()
 	  snprintf(comanda_completa, sizeof(comanda_completa), "view_treasure %s %s", vanatoare, comoara);
 	  trimite_comanda(comanda_completa, SIGUSR2);
 	  pause();
+	  citeste_din_monitor();
 	}
       else if(strcmp(command, "stop_monitor")==0)
 	{
 	  trimite_comanda(command, SIGTERM);
+	  citeste_din_monitor();
 	}
       else
 	{
