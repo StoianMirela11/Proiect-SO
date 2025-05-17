@@ -25,6 +25,7 @@ typedef struct{
 
 int main(int argc, char** argv)
 {
+  setbuf(stdout, NULL);
   if(argc!=2)
     {
       perror("Eroare la argumentele programului de calculare a scorului");
@@ -67,5 +68,6 @@ int main(int argc, char** argv)
       printf("User_name: %s, total score: %d", scoruri[i].user_name, scoruri[i].score);
       printf("\n");
     }
-  return 0;
+  fflush(stdout);
+  exit(0);
 }

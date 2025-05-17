@@ -38,17 +38,18 @@ void meniu()
   printf("4) view_treasure - cere monitorului sa afiseze o comoara dintr-o anumita vanatoare\n");
   printf("5) stop_monitor - cere monitorului sa se oreasca si sa se intoarca la prompt\n");
   printf("6) exit - incheie programul\n");
+  printf("7) calculate_score - calculeaza scorurile utilizatorilor\n");
 }
 
 void sigchld_handler(int sig)
 {
   int status;
-  wait(&status);
-  if(WIFEXITED(status))
-    {
-      printf("Monitorul s-a terminat cu codul %d\n", WEXITSTATUS(status));
-    }
-  monitor_pid=0;
+  pid_t pid = waitpid(-1, &status, WNOHANG);  // nu bloca, doar verifică
+  if (pid > 0 && WIFEXITED(status))
+  {
+    printf("Monitorul s-a terminat cu codul %d\n", WEXITSTATUS(status));
+    monitor_pid = 0;  // setează doar dacă s-a încheiat monitorul
+  }
 }
 
 void semnal_monitor_terminat(int sig)
@@ -200,7 +201,68 @@ void trimite_comanda(char* comanda, int semnal)
     }
 }
 
+void calculate_score() {
+    DIR* dir = opendir(".");
+    if (!dir) {
+        perror("Nu s-a putut deschide directorul");
+        return;
+    }
 
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        struct stat st;
+        if (stat(entry->d_name, &st) == -1) continue;
+        if (!S_ISDIR(st.st_mode)) continue;
+
+        char path[256];
+        if (snprintf(path, sizeof(path), "%s/treasure_file.dat", entry->d_name) >= sizeof(path)) {
+            fprintf(stderr, "[Eroare] Calea prea lunga pentru vanatoarea: %s\n", entry->d_name);
+            continue;
+        }
+
+        if (access(path, F_OK) != 0) continue;
+
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+            perror("Eroare la pipe");
+            continue;
+        }
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            // Proces copil
+            dup2(pipefd[1], STDOUT_FILENO);
+            close(pipefd[0]);
+            close(pipefd[1]);
+            execl("./treasure_score", "treasure_score", path, NULL);
+            perror("Eroare la exec treasure_score");
+            exit(EXIT_FAILURE);
+        } else if (pid > 0) {
+            // Proces părinte
+            close(pipefd[1]);
+
+            char buf[256];
+            ssize_t r;
+
+            printf("Scoruri pentru vanatoarea '%s':\n", entry->d_name);
+            while ((r = read(pipefd[0], buf, sizeof(buf) - 1)) > 0) {
+                buf[r] = '\0';
+                printf("%s", buf);
+            }
+
+            close(pipefd[0]);
+            waitpid(pid, NULL, 0);
+        } else {
+            perror("Eroare la fork");
+            close(pipefd[0]);
+            close(pipefd[1]);
+        }
+    }
+
+    closedir(dir);
+}
 int main()
 {
 
@@ -254,6 +316,19 @@ int main()
 	      exit(0);
 	    }
 	}
+      else if (strcmp(command, "calculate_score") == 0)
+{
+    if (monitor_pid == 0)
+    {
+        printf("Monitorul nu ruleaza. Operatia nu poate fi efectuata.\n");
+    }
+    else
+    {
+        calculate_score();
+        fflush(stdout); // asigură afișarea promptului imediat
+    }
+    continue;
+}
        else if(monitor_pid==0)
 	 {
 	   printf("Monitorul nu ruleaza. Operatia nu poate fi efectuata.\n");
